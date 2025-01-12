@@ -5,19 +5,32 @@ use std::path::PathBuf;
 
 use crate::{Package, Provider};
 
-#[derive(Debug, Default, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct Config {
     pub packages: Vec<Package>,
     pub providers: Vec<Provider>,
-    #[serde(default = "default_install_dir")]
     pub install_dir: PathBuf,
     pub config_handler_version: u8,
 }
 
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            packages: Vec::new(),
+            providers: Vec::new(),
+            install_dir: default_install_dir(),
+            config_handler_version: 0,
+        }
+    }
+}
+
 fn default_install_dir() -> PathBuf {
     BaseDirs::new()
-        .map(|dirs| dirs.data_local_dir().join("diem").join("packages"))
-        .unwrap_or_else(|| PathBuf::from("."))
+        .expect("Could not determine base directories")
+        .executable_dir()
+        .expect("Could not determine executable directory")
+        .join("diem")
+        .join("packages")
 }
 
 impl Config {

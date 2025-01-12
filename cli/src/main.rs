@@ -62,7 +62,7 @@ async fn match_subcommands(args: Cli) -> anyhow::Result<()> {
             } => {
                 // Parse provider string (format: "github:owner/repo@ref:path")
                 let parts: Vec<&str> = provider_name.split(':').collect();
-                if parts.len() != 2 || parts[0] != "github" {
+                if parts.len() != 3 || parts[0] != "github" {
                     anyhow::bail!("Invalid provider format. Expected: github:owner/repo@ref:path");
                 }
 
@@ -76,18 +76,13 @@ async fn match_subcommands(args: Cli) -> anyhow::Result<()> {
                     anyhow::bail!("Invalid owner/repo format. Expected: owner/repo");
                 }
 
-                let path_parts: Vec<&str> = repo_parts[1].split(':').collect();
-                if path_parts.len() != 2 {
-                    anyhow::bail!("Invalid ref:path format. Expected: ref:path");
-                }
-
                 let provider = Provider {
                     name: provider_name.clone(),
                     source: ProviderSource::Github(GithubProvider {
                         owner: owner_repo[0].to_string(),
                         repo: owner_repo[1].to_string(),
-                        ref_: path_parts[0].to_string(),
-                        path: path_parts[1].to_string(),
+                        ref_: repo_parts[1].to_string(),
+                        path: parts[2].to_string(),
                     }),
                     provider_handler_version: 1,
                 };
@@ -140,11 +135,13 @@ async fn install_package(cfg: &Config, package_spec: &str) -> Result<()> {
 
     for provider in &cfg.providers {
         let artifactory_content = provider.fetch_artifactory().await?;
-        let artifactory: Artifactory = serde_json::from_slice(&artifactory_content)?;
+        let artifactory: Artifactory = toml::from_str(&artifactory_content)?;
+        // dbg!(artifactory.clone());
 
         // Look for the package in the artifactory's apps
         for app in artifactory.apps {
             for package in app.packages {
+                // dbg!(&package);
                 if package.name == package_name {
                     if let Some(req_version) = &version {
                         let req_version = semver::Version::from_str(req_version)?;

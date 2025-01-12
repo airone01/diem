@@ -19,7 +19,7 @@ pub enum ProviderSource {
 }
 
 impl Provider {
-    pub async fn fetch_artifactory(&self) -> Result<Vec<u8>> {
+    pub async fn fetch_artifactory(&self) -> Result<String> {
         match &self.source {
             ProviderSource::Github(github) => github.fetch_artifactory().await,
         }
@@ -59,7 +59,7 @@ impl ProviderManager {
         self.providers.values().collect()
     }
 
-    pub async fn fetch_all_artifactories(&self) -> Result<Vec<(String, Vec<u8>)>> {
+    pub async fn fetch_all_artifactories(&self) -> Result<Vec<(String, String)>> {
         let mut artifactories = Vec::new();
         for (name, provider) in &self.providers {
             let content = provider.fetch_artifactory().await?;

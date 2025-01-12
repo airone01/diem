@@ -14,7 +14,7 @@ pub struct GithubProvider {
 }
 
 impl GithubProvider {
-    pub async fn fetch_artifactory(&self) -> Result<Vec<u8>> {
+    pub async fn fetch_artifactory(&self) -> Result<String> {
         let client = Client::new();
         let url = format!(
             "https://raw.githubusercontent.com/{}/{}/{}/{}",
@@ -23,7 +23,8 @@ impl GithubProvider {
 
         let response = client.get(&url).send().await?;
         let bytes = response.bytes().await?;
-        Ok(bytes.to_vec())
+        let str = String::from_utf8(bytes.to_vec())?;
+        Ok(str)
     }
 
     pub async fn download_package(&self, package_path: &str, destination: &PathBuf) -> Result<()> {

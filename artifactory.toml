@@ -1,20 +1,20 @@
 name = "R1's app collection"
-artifactory_handler_version = 1
+artifactory_handler_version = 0
 
 [[apps]]
 name = "eza"
 version = "0.20.16"
-app_handler_version = 1
+app_handler_version = 0
 
 [[apps.commands]]
 command = "eza"
 path = "bin/eza"
 
 [[apps.packages]]
-name = "eza_x86_64-unknown-linux-gnu"
+name = "eza"
 version = "0.20.16"
 sha256 = "d2da926b465e889f812518abac66bf6b66278cb30bcd58af61182564757ece25"
 license = "EUPL-1.2"
 source = "packages/eza_x86_64-unknown-linux-gnu-v0.20.16.tar.gz"
 dependencies = []
-package_handler_version = 1
+package_handler_version = 0
