@@ -1,0 +1,20 @@
+[workspace]
+members = ["cli"]
+default-members = ["cli"]
+resolver = "2"
+
+[workspace.package]
+name = "diem"
+version = "0.1.0"
+edition = "2021"
+authors = ["AirOne01"]
+description = "Simple package manager"
+repository = "https://github.com/airone01/diem"
+homepage = "https://github.com/airone01/diem"
+license = "MIT"
+license-file = "LICENSE"
+readme = "/.github/README.md"
+keywords = ["package-manager", "cli", "rust"]
+
+[workspace.dependencies]
+clap = "4.5.26"

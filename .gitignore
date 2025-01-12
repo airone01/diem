@@ -1,2 +1,8 @@
 # JetBrains
 .idea/
+
+# Nix
+.direnv/
+
+# Rust
+target/
