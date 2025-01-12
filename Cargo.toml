@@ -7,7 +7,7 @@ resolver = "2"
 name = "diem"
 version = "0.1.0"
 edition = "2021"
-authors = ["AirOne01"]
+authors = ["Erwann Lagouche <21955960+AirOne01@users.noreply.github.com>"]
 description = "Simple package manager"
 repository = "https://github.com/airone01/diem"
 homepage = "https://github.com/airone01/diem"
@@ -17,4 +17,6 @@ readme = "/.github/README.md"
 keywords = ["package-manager", "cli", "rust"]
 
 [workspace.dependencies]
-clap = "4.5.26"
+clap = "4"
+clap_complete = "4"
+tokio = "1"

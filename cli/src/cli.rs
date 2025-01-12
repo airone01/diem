@@ -2,10 +2,11 @@ use std::path::PathBuf;
 
 use clap::builder::styling::{Color, Style};
 use clap::{Parser, Subcommand};
+use clap_complete::Shell;
 
 /// A package manager
 #[derive(Debug, Parser)]
-#[command(name = "git")]
+#[command(name = "diem")]
 #[command(about = "A package manager", long_about = None)]
 #[command(styles = get_styles())]
 #[command(arg_required_else_help = true)]
@@ -25,7 +26,6 @@ pub enum Commands {
     /// Install a package
     #[command(aliases = ["i", "in", "add", "get"])]
     #[command(long_about = "Install one or more packages for the current user")]
-    #[command(arg_required_else_help = true)]
     Install {
         /// The package to install
         package: String,
@@ -34,7 +34,6 @@ pub enum Commands {
     /// Uninstall a package
     #[command(aliases = ["un", "rm", "delete", "uninstall"])]
     #[command(long_about = "Uninstall one or more packages for the current user")]
-    #[command(arg_required_else_help = true)]
     Remove {
         /// The package to uninstall
         package: String,
@@ -48,6 +47,13 @@ pub enum Commands {
     Update {
         /// The package to update
         package: Option<String>,
+    },
+
+    /// Generate shell completions
+    #[command(aliases = ["complete"])]
+    Completions {
+        /// The shell to generate completions for
+        shell: Shell,
     },
 }
 

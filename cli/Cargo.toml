@@ -1,8 +1,11 @@
 [package]
 name = "diem"
+version.workspace = true
 description.workspace = true
 edition.workspace = true
 readme.workspace = true
 
 [dependencies]
 clap = { workspace = true, features = ["derive", "env", "color"] }
+clap_complete.workspace = true
+tokio = { workspace = true, features = ["full"] }
