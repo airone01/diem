@@ -11,3 +11,5 @@ clap_complete.workspace = true
 tokio = { workspace = true, features = ["full"] }
 semver = { workspace = true, features = ["serde"] }
 serde = { workspace = true, features = ["derive"] }
+confy.workspace = true
+anyhow.workspace = true

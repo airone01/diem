@@ -2,15 +2,14 @@
 pub(crate) mod command;
 
 use semver::Version;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
-use crate::{AppCommand, Package};
+use crate::AppCommand;
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct App {
     pub name: String,
     pub version: Version,
-    pub package: Package,
     pub commands: Vec<AppCommand>,
     pub app_handler_version: u8,
 }

@@ -49,7 +49,7 @@ pub enum Commands {
         package: Option<String>,
     },
 
-    /// Generate shell completions
+    /// Generate shell completions for a given shell
     #[command(aliases = ["complete"])]
     Completions {
         /// The shell to generate completions for

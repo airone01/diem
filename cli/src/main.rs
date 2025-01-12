@@ -1,11 +1,30 @@
-use clap_complete::{generate, Generator};
-use diem::{Cli, Commands};
+use clap::{CommandFactory as _, Parser as _};
+use clap_complete::generate;
 
-use clap::{Command, CommandFactory as _, Parser as _};
+use diem::{Cli, Commands, Config};
 
 #[tokio::main]
-async fn main() {
+async fn main() -> anyhow::Result<()> {
     let args = Cli::parse();
+
+    match args.command {
+        Commands::Completions { shell } => {
+            let mut cmd = Cli::command();
+            generate(
+                shell,
+                &mut cmd,
+                Cli::command().get_name().to_string(),
+                &mut std::io::stdout(),
+            );
+            Ok(())
+        }
+        _ => match_subcommands(args).await,
+    }
+}
+
+async fn match_subcommands(args: Cli) -> anyhow::Result<()> {
+    let cfg: Config = confy::load("diem", None)?;
+    dbg!(cfg);
 
     match args.command {
         Commands::Install { package } => {
@@ -17,13 +36,6 @@ async fn main() {
         Commands::Update { package } => {
             unimplemented!("Update package: {:?}", package);
         }
-        Commands::Completions { shell } => {
-            eprintln!("Generating completion file for {shell}...");
-            print_completions(shell, &mut Cli::command());
-        }
+        _ => Ok(()),
     }
-}
-
-fn print_completions<G: Generator>(gen: G, cmd: &mut Command) {
-    generate(gen, cmd, cmd.get_name().to_string(), &mut std::io::stdout());
 }
