@@ -2,11 +2,9 @@ use anyhow::Result;
 use clap::{CommandFactory as _, Parser as _};
 use clap_complete::generate;
 
-use std::str::FromStr;
-
 use diem::{
-    Artifactory, Cli, Commands, Config, GithubProvider, PackageManager, Provider, ProviderSource,
-    ProvidersCommands,
+    AppManager, Cli, Commands, Config, GithubProvider, PackageManager, Provider, ProviderManager,
+    ProviderSource, ProvidersCommands,
 };
 
 /// The main entry point for the CLI application.
@@ -25,22 +23,28 @@ async fn main() -> anyhow::Result<()> {
             );
             Ok(())
         }
-        _ => match_subcommands(args).await,
+        _ => match_commands(args).await,
     }
 }
 
 /// For all commands that require the configuration file to be loaded,
 /// this function will load the configuration file and then match the
 /// subcommands.
-async fn match_subcommands(args: Cli) -> anyhow::Result<()> {
-    let mut cfg: Config = confy::load("diem", "config")?;
+async fn match_commands(args: Cli) -> anyhow::Result<()> {
+    let cfg: Config = confy::load("diem", "config")?;
     cfg.ensure_dirs_exist()?;
 
     match args.command {
         Commands::Completions { .. } => unreachable!(),
-        Commands::Install { package } => {
-            println!("Installing package: {}", package);
-            install_package(&cfg, &package).await?;
+        Commands::Install { app } => {
+            println!("Installing app: {}", app);
+
+            let package_manager = PackageManager::new(cfg.install_dir.clone());
+            let app_manager = AppManager::new(package_manager);
+            let provider_manager = ProviderManager::new_from_config(&cfg);
+
+            let (app, provider) = provider_manager.find_app(&app).await?;
+            app_manager.install_app(&app, &provider).await?;
         }
         Commands::Remove { package } => {
             println!("Removing package: {}", package);
@@ -56,126 +60,61 @@ async fn match_subcommands(args: Cli) -> anyhow::Result<()> {
             // TODO: Implement package updates
             unimplemented!()
         }
-        Commands::Providers { command } => match command {
-            ProvidersCommands::Add {
-                provider: provider_name,
-            } => {
-                // Parse provider string (format: "github:owner/repo@ref:path")
-                let parts: Vec<&str> = provider_name.split(':').collect();
-                if parts.len() != 3 || parts[0] != "github" {
-                    anyhow::bail!("Invalid provider format. Expected: github:owner/repo@ref:path");
-                }
-
-                let repo_parts: Vec<&str> = parts[1].split('@').collect();
-                if repo_parts.len() != 2 {
-                    anyhow::bail!("Invalid repository format. Expected: owner/repo@ref");
-                }
-
-                let owner_repo: Vec<&str> = repo_parts[0].split('/').collect();
-                if owner_repo.len() != 2 {
-                    anyhow::bail!("Invalid owner/repo format. Expected: owner/repo");
-                }
-
-                let provider = Provider {
-                    name: provider_name.clone(),
-                    source: ProviderSource::Github(GithubProvider {
-                        owner: owner_repo[0].to_string(),
-                        repo: owner_repo[1].to_string(),
-                        ref_: repo_parts[1].to_string(),
-                        path: parts[2].to_string(),
-                    }),
-                    provider_handler_version: 1,
-                };
-
-                // Add provider to config
-                cfg.providers.push(provider);
-                confy::store("diem", "config", &cfg)?;
-                println!("Added provider: {}", provider_name);
-            }
-            ProvidersCommands::Remove { provider } => {
-                cfg.providers.retain(|p| p.name != provider);
-                confy::store("diem", "config", &cfg)?;
-                println!("Removed provider: {}", provider);
-            }
-            ProvidersCommands::List => {
-                println!("Installed providers:");
-                for provider in &cfg.providers {
-                    println!("  - {}", provider.name);
-                }
-            }
-        },
+        Commands::Providers { command } => match_providers_commands(cfg, command).await?,
     }
     Ok(())
 }
 
-async fn install_package(cfg: &Config, package_spec: &str) -> Result<()> {
-    // Parse package specification (format: package_name@version)
-    let (package_name, version) = if package_spec.contains('@') {
-        let parts: Vec<&str> = package_spec.split('@').collect();
-        (parts[0].to_string(), Some(parts[1].to_string()))
-    } else {
-        (package_spec.to_string(), None)
-    };
+async fn match_providers_commands(mut cfg: Config, command: ProvidersCommands) -> Result<()> {
+    let mut provider_manager = ProviderManager::new_from_config(&cfg);
+    match command {
+        ProvidersCommands::Add {
+            provider: provider_name,
+        } => {
+            // Parse provider string (format: "github:owner/repo@ref:path")
+            let parts: Vec<&str> = provider_name.split(':').collect();
+            if parts.len() != 3 || parts[0] != "github" {
+                anyhow::bail!("Invalid provider format. Expected: github:owner/repo@ref:path");
+            }
 
-    // Initialize package manager
-    let package_manager = PackageManager::new(cfg.install_dir.clone());
+            let repo_parts: Vec<&str> = parts[1].split('@').collect();
+            if repo_parts.len() != 2 {
+                anyhow::bail!("Invalid repository format. Expected: owner/repo@ref");
+            }
 
-    // Check if already installed
-    if package_manager
-        .is_package_installed(&package_name, version.as_deref())
-        .await
-    {
-        println!("Package {} is already installed", package_spec);
-        return Ok(());
-    }
+            let owner_repo: Vec<&str> = repo_parts[0].split('/').collect();
+            if owner_repo.len() != 2 {
+                anyhow::bail!("Invalid owner/repo format. Expected: owner/repo");
+            }
 
-    // Fetch artifactories from all providers
-    let mut found_package = None;
-    let mut using_provider = None;
+            let provider = Provider {
+                name: provider_name.clone(),
+                source: ProviderSource::Github(GithubProvider {
+                    owner: owner_repo[0].to_string(),
+                    repo: owner_repo[1].to_string(),
+                    ref_: repo_parts[1].to_string(),
+                    path: parts[2].to_string(),
+                }),
+                provider_handler_version: 1,
+            };
 
-    for provider in &cfg.providers {
-        let artifactory_content = provider.fetch_artifactory().await?;
-        let artifactory: Artifactory = toml::from_str(&artifactory_content)?;
-        // dbg!(artifactory.clone());
-
-        // Look for the package in the artifactory's apps
-        for app in artifactory.apps {
-            for package in app.packages {
-                // dbg!(&package);
-                if package.name == package_name {
-                    if let Some(req_version) = &version {
-                        let req_version = semver::Version::from_str(req_version)?;
-                        let pkg_version = semver::Version::from_str(&package.version)?;
-                        if pkg_version == req_version {
-                            found_package = Some(package);
-                            using_provider = Some(provider);
-                            break;
-                        }
-                    } else {
-                        // If no version specified, use the latest
-                        if let Some(existing) = &found_package {
-                            let existing_version = semver::Version::from_str(&existing.version)?;
-                            let pkg_version = semver::Version::from_str(&package.version)?;
-                            if pkg_version > existing_version {
-                                found_package = Some(package);
-                                using_provider = Some(provider);
-                            }
-                        } else {
-                            found_package = Some(package);
-                            using_provider = Some(provider);
-                        }
-                    }
-                }
+            provider_manager.add_provider(provider)?;
+            provider_manager.save_to_config(&mut cfg);
+            confy::store("diem", "config", &cfg)?;
+            println!("Added provider: {}", provider_name);
+        }
+        ProvidersCommands::Remove { provider } => {
+            provider_manager.remove_provider(&provider)?;
+            provider_manager.save_to_config(&mut cfg);
+            confy::store("diem", "config", &cfg)?;
+            println!("Removed provider: {}", provider);
+        }
+        ProvidersCommands::List => {
+            println!("Installed providers:");
+            for provider in provider_manager.list_providers() {
+                println!("  - {}", provider.name);
             }
         }
     }
-
-    // Install the package if found
-    if let (Some(package), Some(provider)) = (found_package, using_provider) {
-        package_manager.install_package(&package, provider).await?;
-        println!("Successfully installed {}", package_spec);
-        Ok(())
-    } else {
-        anyhow::bail!("Package {} not found in any provider", package_spec);
-    }
+    Ok(())
 }

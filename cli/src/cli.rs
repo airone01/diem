@@ -27,8 +27,8 @@ pub enum Commands {
     #[command(aliases = ["i", "in", "add", "get"])]
     #[command(long_about = "Install one or more packages for the current user")]
     Install {
-        /// The package to install
-        package: String,
+        /// The app to install
+        app: String,
     },
 
     /// Uninstall a package
@@ -87,11 +87,11 @@ pub enum ProvidersCommands {
 const BLURPLE: (u8, u8, u8) = (90, 69, 254);
 
 // Generic gradient
-const PURPLE: (u8, u8, u8) = (239, 0, 199);
+// const PURPLE: (u8, u8, u8) = (239, 0, 199);
 const PINK: (u8, u8, u8) = (255, 43, 137);
-const ORANGE: (u8, u8, u8) = (255, 128, 89);
-const GOLD: (u8, u8, u8) = (255, 194, 72);
-const YELLOW: (u8, u8, u8) = (249, 248, 113);
+// const ORANGE: (u8, u8, u8) = (255, 128, 89);
+// const GOLD: (u8, u8, u8) = (255, 194, 72);
+// const YELLOW: (u8, u8, u8) = (249, 248, 113);
 
 // From switch palette
 const BRIGHT_MAGENTA: (u8, u8, u8) = (228, 180, 255);

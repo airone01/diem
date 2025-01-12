@@ -1,5 +1,6 @@
 /// This files defines an App as defined in an app configuration file.
 pub(crate) mod command;
+pub(crate) mod manager;
 
 use semver::Version;
 use serde::{Deserialize, Serialize};
