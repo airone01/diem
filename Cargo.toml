@@ -20,3 +20,5 @@ keywords = ["package-manager", "cli", "rust"]
 clap = "4"
 clap_complete = "4"
 tokio = "1"
+semver = "1"
+serde = "1"
