@@ -9,5 +9,5 @@ pub use app::{command::AppCommand, App};
 pub use artifactory::Artifactory;
 pub use cli::{Cli, Commands, ProvidersCommands};
 pub use config::Config;
-pub use package::Package;
+pub use package::{Package, PackageManager};
 pub use provider::{github::GithubProvider, Provider, ProviderSource};

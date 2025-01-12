@@ -1,7 +1,13 @@
+use anyhow::Result;
 use clap::{CommandFactory as _, Parser as _};
 use clap_complete::generate;
 
-use diem::{Cli, Commands, Config, GithubProvider, Provider, ProviderSource, ProvidersCommands};
+use std::str::FromStr;
+
+use diem::{
+    Artifactory, Cli, Commands, Config, GithubProvider, PackageManager, Provider, ProviderSource,
+    ProvidersCommands,
+};
 
 /// The main entry point for the CLI application.
 #[tokio::main]
@@ -28,13 +34,13 @@ async fn main() -> anyhow::Result<()> {
 /// subcommands.
 async fn match_subcommands(args: Cli) -> anyhow::Result<()> {
     let mut cfg: Config = confy::load("diem", "config")?;
+    cfg.ensure_dirs_exist()?;
 
     match args.command {
         Commands::Completions { .. } => unreachable!(),
         Commands::Install { package } => {
             println!("Installing package: {}", package);
-            // TODO: Implement package installation
-            unimplemented!()
+            install_package(&cfg, &package).await?;
         }
         Commands::Remove { package } => {
             println!("Removing package: {}", package);
@@ -105,4 +111,74 @@ async fn match_subcommands(args: Cli) -> anyhow::Result<()> {
         },
     }
     Ok(())
+}
+
+async fn install_package(cfg: &Config, package_spec: &str) -> Result<()> {
+    // Parse package specification (format: package_name@version)
+    let (package_name, version) = if package_spec.contains('@') {
+        let parts: Vec<&str> = package_spec.split('@').collect();
+        (parts[0].to_string(), Some(parts[1].to_string()))
+    } else {
+        (package_spec.to_string(), None)
+    };
+
+    // Initialize package manager
+    let package_manager = PackageManager::new(cfg.install_dir.clone());
+
+    // Check if already installed
+    if package_manager
+        .is_package_installed(&package_name, version.as_deref())
+        .await
+    {
+        println!("Package {} is already installed", package_spec);
+        return Ok(());
+    }
+
+    // Fetch artifactories from all providers
+    let mut found_package = None;
+    let mut using_provider = None;
+
+    for provider in &cfg.providers {
+        let artifactory_content = provider.fetch_artifactory().await?;
+        let artifactory: Artifactory = serde_json::from_slice(&artifactory_content)?;
+
+        // Look for the package in the artifactory's apps
+        for app in artifactory.apps {
+            for package in app.packages {
+                if package.name == package_name {
+                    if let Some(req_version) = &version {
+                        let req_version = semver::Version::from_str(req_version)?;
+                        let pkg_version = semver::Version::from_str(&package.version)?;
+                        if pkg_version == req_version {
+                            found_package = Some(package);
+                            using_provider = Some(provider);
+                            break;
+                        }
+                    } else {
+                        // If no version specified, use the latest
+                        if let Some(existing) = &found_package {
+                            let existing_version = semver::Version::from_str(&existing.version)?;
+                            let pkg_version = semver::Version::from_str(&package.version)?;
+                            if pkg_version > existing_version {
+                                found_package = Some(package);
+                                using_provider = Some(provider);
+                            }
+                        } else {
+                            found_package = Some(package);
+                            using_provider = Some(provider);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Install the package if found
+    if let (Some(package), Some(provider)) = (found_package, using_provider) {
+        package_manager.install_package(&package, provider).await?;
+        println!("Successfully installed {}", package_spec);
+        Ok(())
+    } else {
+        anyhow::bail!("Package {} not found in any provider", package_spec);
+    }
 }

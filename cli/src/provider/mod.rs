@@ -2,6 +2,7 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
 use std::collections::HashMap;
+use std::path::PathBuf;
 
 pub(crate) mod github;
 
@@ -21,6 +22,14 @@ impl Provider {
     pub async fn fetch_artifactory(&self) -> Result<Vec<u8>> {
         match &self.source {
             ProviderSource::Github(github) => github.fetch_artifactory().await,
+        }
+    }
+
+    pub async fn download_package(&self, package_path: &str, destination: &PathBuf) -> Result<()> {
+        match &self.source {
+            ProviderSource::Github(github) => {
+                github.download_package(package_path, destination).await
+            }
         }
     }
 }
