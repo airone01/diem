@@ -6,3 +6,6 @@
 
 # Rust
 target/
+
+# LLMs
+repomix-output.txt
