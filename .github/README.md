@@ -17,7 +17,16 @@
 
 ## Features
 
-TODO
+- Package installation/uninstallation
+- Management of package providers ("sources")
+
+> [!NOTE]
+> **Detailed package installation explaination**
+> - Diem handles providers. A single provider could be called "John's repo" and be a GitHub repo of John.
+> - John will define a configuration called an artifactory in his repo. Diem will look for that artifactory file and be taught the apps that this artifactory provides, as well as where the packages needed for these apps are located relative to the artifactory file.
+> - When installing an app, diem will resolve the apps and the packages, and will take note of all the required packages and if packages are missing from the artifactory.
+> - Then it will download/retrieve the packages from the artifactory and store them locally.
+> - Finally, it will extract them to a directory defined in the configuration.
 
 ## Installation
 

@@ -49,12 +49,38 @@ pub enum Commands {
         package: Option<String>,
     },
 
+    /// Configure the package providers
+    #[command(long_about = "Configure the package providers for the current user")]
+    Providers {
+        /// The provider to configure
+        #[command(subcommand)]
+        command: ProvidersCommands,
+    },
+
     /// Generate shell completions for a given shell
     #[command(aliases = ["complete"])]
     Completions {
         /// The shell to generate completions for
         shell: Shell,
     },
+}
+
+#[derive(Debug, Subcommand)]
+pub enum ProvidersCommands {
+    /// Add a provider
+    Add {
+        /// The provider to add
+        provider: String,
+    },
+
+    /// Remove a provider
+    Remove {
+        /// The provider to remove
+        provider: String,
+    },
+
+    /// List all providers
+    List,
 }
 
 // Original color

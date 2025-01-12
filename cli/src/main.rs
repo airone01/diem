@@ -3,6 +3,7 @@ use clap_complete::generate;
 
 use diem::{Cli, Commands, Config};
 
+/// The main entry point for the CLI application.
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let args = Cli::parse();
@@ -22,11 +23,15 @@ async fn main() -> anyhow::Result<()> {
     }
 }
 
+/// For all commands that require the configuration file to be loaded,
+/// this function will load the configuration file and then match the
+/// subcommands.
 async fn match_subcommands(args: Cli) -> anyhow::Result<()> {
-    let cfg: Config = confy::load("diem", None)?;
+    let cfg: Config = confy::load("diem", "config")?;
     dbg!(cfg);
 
     match args.command {
+        Commands::Completions { .. } => unreachable!(),
         Commands::Install { package } => {
             unimplemented!("Install package: {}", package);
         }
@@ -36,6 +41,8 @@ async fn match_subcommands(args: Cli) -> anyhow::Result<()> {
         Commands::Update { package } => {
             unimplemented!("Update package: {:?}", package);
         }
-        _ => Ok(()),
+        Commands::Providers { command } => match command {
+            _ => unimplemented!("Provider command"),
+        },
     }
 }
