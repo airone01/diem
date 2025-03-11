@@ -9,3 +9,7 @@ target/
 
 # LLMs
 repomix-output.txt
+/sgoinfre/
+/test-packages/
+/test_home/
+/test_script.sh
