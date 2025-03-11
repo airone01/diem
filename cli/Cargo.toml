@@ -9,6 +9,7 @@ readme.workspace = true
 clap = { workspace = true, features = ["derive", "env", "color"] }
 clap_complete.workspace = true
 tokio = { workspace = true, features = ["full"] }
+tokio-stream = { workspace = true, features = ["fs"] }
 semver = { workspace = true, features = ["serde"] }
 serde = { workspace = true, features = ["derive"] }
 confy.workspace = true

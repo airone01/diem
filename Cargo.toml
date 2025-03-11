@@ -20,6 +20,7 @@ keywords = ["package-manager", "cli", "rust"]
 clap = "4"
 clap_complete = "4"
 tokio = "1"
+tokio-stream = "0.1"
 semver = "1"
 serde = "1"
 confy = "0"
