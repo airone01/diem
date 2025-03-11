@@ -13,5 +13,6 @@ pub struct App {
     pub packages: Vec<Package>,
     pub version: Version,
     pub commands: Vec<AppCommand>,
+    pub license: String,
     pub app_handler_version: u8,
 }

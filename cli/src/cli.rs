@@ -56,6 +56,41 @@ pub enum Commands {
         #[command(subcommand)]
         command: ProvidersCommands,
     },
+    
+    /// Manage artifactories
+    #[command(aliases = ["art", "registry"])]
+    #[command(long_about = "Subscribe to, create, or manage artifactories (package registries)")]
+    Artifactory {
+        /// The artifactory command to run
+        #[command(subcommand)]
+        command: ArtifactoryCommands,
+    },
+    
+    /// Search for packages in subscribed artifactories
+    #[command(aliases = ["s", "find"])]
+    #[command(long_about = "Search for packages in all subscribed artifactories")]
+    Search {
+        /// The query to search for
+        query: String,
+    },
+    
+    /// List all apps available from subscribed artifactories
+    #[command(aliases = ["ls"])]
+    #[command(long_about = "List all available apps from subscribed artifactories")]
+    List,
+    
+    /// Sync packages between sgoinfre and goinfre directories
+    #[command(long_about = "Sync packages from sgoinfre to goinfre directory")]
+    Sync,
+    
+    /// Configure directories used by diem
+    #[command(aliases = ["cfg", "dirs"])]
+    #[command(long_about = "Configure the directories used by diem")]
+    Config {
+        /// The configuration command to run
+        #[command(subcommand)]
+        command: ConfigCommands,
+    },
 
     /// Generate shell completions for a given shell
     #[command(aliases = ["complete"])]
@@ -81,6 +116,89 @@ pub enum ProvidersCommands {
 
     /// List all providers
     List,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum ArtifactoryCommands {
+    /// Subscribe to an artifactory
+    Subscribe {
+        /// The name for this artifactory subscription
+        name: String,
+        
+        /// The path to the artifactory file or URL
+        source: String,
+        
+        /// Whether to automatically update from this artifactory
+        #[arg(short, long)]
+        auto_update: bool,
+    },
+    
+    /// Unsubscribe from an artifactory
+    Unsubscribe {
+        /// The name of the artifactory to unsubscribe from
+        name: String,
+    },
+    
+    /// List all subscribed artifactories
+    List,
+    
+    /// Create a new artifactory
+    Create {
+        /// The name of the artifactory
+        name: String,
+        
+        /// The path where to save the artifactory
+        #[arg(short, long)]
+        path: PathBuf,
+        
+        /// Whether this artifactory should be publicly accessible
+        #[arg(short, long)]
+        public: bool,
+        
+        /// Description of the artifactory
+        #[arg(short, long)]
+        description: Option<String>,
+        
+        /// Maintainer of the artifactory
+        #[arg(short, long)]
+        maintainer: Option<String>,
+    },
+    
+    /// Add an app to an artifactory
+    AddApp {
+        /// Path to the artifactory file
+        artifactory: PathBuf,
+        
+        /// Path to the app definition file
+        app: PathBuf,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+pub enum ConfigCommands {
+    /// Set the sgoinfre directory
+    #[command(name = "set-sgoinfre")]
+    SetSgoinfre {
+        /// Path to the sgoinfre directory
+        path: PathBuf,
+    },
+    
+    /// Set the goinfre directory
+    #[command(name = "set-goinfre")]
+    SetGoinfre {
+        /// Path to the goinfre directory
+        path: PathBuf,
+    },
+    
+    /// Set the shared artifactory directory
+    #[command(name = "set-shared-artifactory")]
+    SetSharedArtifactory {
+        /// Path to the shared artifactory directory
+        path: PathBuf,
+    },
+    
+    /// Show the current configuration
+    Show,
 }
 
 // Original color
