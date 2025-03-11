@@ -1,13 +1,13 @@
 use anyhow::Result;
-use indicatif::{ProgressBar, ProgressStyle};
 use semver::Version;
 use sha2::{Digest, Sha256};
 use tokio::fs;
 use tokio_stream::StreamExt;
+use colored::*;
 
 use std::path::PathBuf;
 
-use crate::{AppCommand, Provider};
+use crate::{AppCommand, Provider, utils::ui};
 
 use super::Package;
 
@@ -23,10 +23,10 @@ fn list_directory_contents(dir: &std::path::Path, level: usize) -> std::io::Resu
         let indent = "  ".repeat(level);
         
         if path.is_dir() {
-            println!("{}📁 {}", indent, path.file_name().unwrap().to_string_lossy());
+            println!("{}📁 {}", indent, path.file_name().unwrap().to_string_lossy().blue());
             list_directory_contents(&path, level + 1)?;
         } else {
-            println!("{}📄 {}", indent, path.file_name().unwrap().to_string_lossy());
+            println!("{}📄 {}", indent, path.file_name().unwrap().to_string_lossy().green());
         }
     }
     
@@ -52,10 +52,10 @@ impl PackageManager {
         &'a self,
         package: &'a Package,
         provider: &'a Provider,
-        pb: &'a ProgressBar,
+        pb: &'a indicatif::ProgressBar,
     ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>> + 'a>> {
         Box::pin(async move {
-            pb.set_message(format!("Installing package: {}", package.name));
+            pb.set_message(format!("Installing package: {}", package.name.cyan()));
 
             // First, handle dependencies recursively
             for dep in &package.dependencies {
@@ -68,25 +68,25 @@ impl PackageManager {
                 .join(&package.name)
                 .join(&package.version.to_string());
             if package_dir.exists() {
-                pb.finish_with_message(format!("Package {} is already installed", package.name));
+                pb.finish_with_message(ui::success(&format!("Package {} is already installed", package.name)));
                 return Ok(());
             }
 
             // Create package directory
-            println!("Creating package directory: {}", package_dir.display());
+            pb.set_message(format!("Creating directory: {}", package_dir.display().to_string().cyan()));
             fs::create_dir_all(&package_dir).await
                 .map_err(|e| anyhow::anyhow!("Failed to create package directory {}: {}", package_dir.display(), e))?;
 
             // Download package
             if let Some(source) = &package.source {
-                pb.set_message(format!("Downloading package: {}", package.name));
+                pb.set_message(format!("Downloading package: {}", package.name.cyan()));
 
                 // Download to a temporary location
                 let temp_path = package_dir.join("package.tmp");
                 provider.download_package(source, &temp_path).await?;
 
                 // Verify checksum
-                pb.set_message(format!("Verifying package: {}", package.name));
+                pb.set_message(format!("Verifying package: {}", package.name.cyan()));
                 let content = fs::read(&temp_path).await?;
                 let mut hasher = Sha256::new();
                 hasher.update(&content);
@@ -95,19 +95,22 @@ impl PackageManager {
                 if hash != package.sha256 {
                     fs::remove_dir_all(&package_dir).await?;
                     anyhow::bail!(
-                        "Checksum verification failed for package: {}. Expected: {}, Got: {}",
-                        package.name,
-                        package.sha256,
-                        hash
+                        "{}",
+                        ui::error(&format!(
+                            "Checksum verification failed for package: {}. Expected: {}, Got: {}",
+                            package.name,
+                            package.sha256,
+                            hash
+                        ))
                     );
                 }
 
                 // Extract package
-                pb.set_message(format!("Extracting package: {}", package.name));
+                pb.set_message(format!("Extracting package: {}", package.name.cyan()));
                 
                 // Special case for our test hello package
                 if source.ends_with("hello-1.0.0.tar.gz") {
-                    println!("Direct extraction of hello package");
+                    println!("{}", ui::info("Direct extraction of hello package"));
                     let hello_content = "#!/bin/bash\necho \"Hello from diem!\"";
                     std::fs::write(package_dir.join("hello"), hello_content)?;
                     
@@ -133,14 +136,14 @@ impl PackageManager {
                     let mut output_file = std::fs::File::create(&temp_tar)?;
                     std::io::copy(&mut decoder, &mut output_file)?;
                     
-                    // Now manually untar to be more verbald about what's happening
+                    // Now manually untar to be more verbose about what's happening
                     let file = std::fs::File::open(&temp_tar)?;
                     let mut archive = tar::Archive::new(file);
                     
                     for entry in archive.entries()? {
                         let mut entry = entry?;
                         let path = entry.path()?;
-                        println!("Extracting file: {}", path.display());
+                        println!("{}", ui::info(&format!("Extracting file: {}", path.display())));
                         
                         // Extract the entry
                         entry.unpack_in(&package_dir)?;
@@ -151,8 +154,8 @@ impl PackageManager {
                 }
 
                 // List extracted files
-                println!("Listing extracted files in: {}", package_dir.display());
-                println!("WARNING: If no files are shown below, it means extraction failed or files were extracted to wrong directory!");
+                println!("{}", ui::section(&format!("Files extracted to: {}", package_dir.display())));
+                println!("{}", ui::warning("If no files are shown below, it means extraction failed or files were extracted to wrong directory!"));
                 let std_dir = std::path::Path::new(&package_dir);
                 list_directory_contents(std_dir, 0)?;
 
@@ -160,19 +163,15 @@ impl PackageManager {
                 fs::remove_file(temp_path).await?;
             }
 
-            pb.finish_with_message(format!("Successfully installed {}", package.name));
+            pb.finish_with_message(ui::success(&format!("Successfully installed {}", package.name)));
             Ok(())
         })
     }
 
     pub async fn install_package(&self, package: &Package, provider: &Provider) -> Result<()> {
-        // Create progress bar
-        let pb = ProgressBar::new_spinner();
-        pb.set_style(
-            ProgressStyle::default_spinner()
-                .template("{spinner:.green} [{elapsed_precise}] {msg}")
-                .unwrap(),
-        );
+        // Create progress bar with improved style
+        let pb = ui::spinner();
+        pb.enable_steady_tick(std::time::Duration::from_millis(80));
 
         // Call the internal implementation with proper boxing
         self.install_package_internal(package, provider, &pb).await
@@ -180,23 +179,29 @@ impl PackageManager {
 
     pub async fn uninstall_package(&self, package_name: &str, version: Option<&str>) -> Result<()> {
         let package_dir = self.install_dir.join(package_name);
+        let pb = ui::spinner();
+        pb.enable_steady_tick(std::time::Duration::from_millis(80));
 
         if let Some(version) = version {
             // Remove specific version
             let version_dir = package_dir.join(version);
+            pb.set_message(format!("Removing {} version {}", package_name.cyan(), version.yellow()));
+            
             if version_dir.exists() {
                 fs::remove_dir_all(version_dir).await?;
-                println!("Uninstalled {} version {}", package_name, version);
+                pb.finish_with_message(ui::success(&format!("Uninstalled {} version {}", package_name, version)));
             } else {
-                println!("Version {} of {} is not installed", version, package_name);
+                pb.finish_with_message(ui::warning(&format!("Version {} of {} is not installed", version, package_name)));
             }
         } else {
             // Remove all versions
+            pb.set_message(format!("Removing all versions of {}", package_name.cyan()));
+            
             if package_dir.exists() {
                 fs::remove_dir_all(package_dir).await?;
-                println!("Uninstalled all versions of {}", package_name);
+                pb.finish_with_message(ui::success(&format!("Uninstalled all versions of {}", package_name)));
             } else {
-                println!("Package {} is not installed", package_name);
+                pb.finish_with_message(ui::warning(&format!("Package {} is not installed", package_name)));
             }
         }
 
@@ -207,9 +212,13 @@ impl PackageManager {
         // Check if the package is already installed
         let package_dir = self.install_dir.join(&package.name);
         let version_dir = package_dir.join(&package.version.to_string());
+        let pb = ui::spinner();
+        
+        pb.set_message(format!("Checking package: {}", package.name.cyan()));
         
         if version_dir.exists() {
-            println!("Package {} version {} is already installed", package.name, package.version);
+            pb.finish_with_message(ui::info(&format!("Package {} version {} is already installed", 
+                package.name, package.version.to_string().yellow())));
             return Ok(());
         }
         
@@ -230,9 +239,11 @@ impl PackageManager {
         };
         
         if has_older_version {
-            println!("Updating {} to version {}", package.name, package.version);
+            pb.finish_with_message(ui::info(&format!("Updating {} to version {}", 
+                package.name, package.version.to_string().yellow())));
         } else {
-            println!("Installing {} version {}", package.name, package.version);
+            pb.finish_with_message(ui::info(&format!("Installing {} version {}", 
+                package.name, package.version.to_string().yellow())));
         }
         
         // Install the new version

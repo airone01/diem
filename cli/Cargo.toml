@@ -17,7 +17,7 @@ anyhow.workspace = true
 bytes.workspace = true
 reqwest = { workspace = true, features = ["stream"] }
 thiserror.workspace = true
-indicatif.workspace = true
+indicatif = { workspace = true, features = ["unicode-width"] }
 flate2.workspace = true
 zip.workspace = true
 tar.workspace = true
@@ -25,3 +25,5 @@ sha2.workspace = true
 directories.workspace = true
 futures-util.workspace = true
 toml.workspace = true
+colored.workspace = true
+cli-table.workspace = true
