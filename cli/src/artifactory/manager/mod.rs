@@ -102,7 +102,7 @@ impl ArtifactoryManager {
         toml::from_str(&content).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
     }
 
-    fn load_from_url(&self, url: &str) -> io::Result<Artifactory> {
+    fn load_from_url(&self, _url: &str) -> io::Result<Artifactory> {
         // This would use a HTTP client to fetch the artifactory file
         // For simplicity, we'll return an error for now
         Err(io::Error::new(

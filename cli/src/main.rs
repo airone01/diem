@@ -1,12 +1,14 @@
 use anyhow::Result;
 use clap::{CommandFactory as _, Parser as _};
 use clap_complete::generate;
+use colored::*;
 
 use diem::{
     AppManager, Artifactory, Cli, Commands, Config, GithubProvider, PackageManager, Provider, ProviderManager,
     ProviderSource, ProvidersCommands, ArtifactoryCommands, ConfigCommands, 
     artifactory::manager::ArtifactoryManager,
     config::{ArtifactorySource, ArtifactorySubscription},
+    utils::ui,
 };
 
 /// The main entry point for the CLI application.
@@ -42,17 +44,24 @@ async fn match_commands(args: Cli) -> anyhow::Result<()> {
     match args.command {
         Commands::Completions { .. } => unreachable!(),
         Commands::Install { app } => {
-            println!("Installing app: {}", app);
+            println!("{}", ui::title(&format!("Installing: {}", app)));
 
+            let pb = ui::spinner();
+            pb.set_message("Initializing package manager...");
+            
             let package_manager = PackageManager::new(cfg.install_dir.clone());
             let app_manager = AppManager::new(package_manager);
             let provider_manager = ProviderManager::new_from_config(&cfg);
 
+            pb.set_message(format!("Finding app: {}", app.cyan()));
             let (app, provider) = provider_manager.find_app(&app, &cfg).await?;
+            pb.finish_with_message(ui::success(&format!("Found app: {} in {}", 
+                app.name.green(), provider.name.blue())));
+                
             app_manager.install_app(&app, &provider).await?;
         }
         Commands::Remove { package } => {
-            println!("Removing package: {}", package);
+            println!("{}", ui::title(&format!("Removing: {}", package)));
             
             let package_manager = PackageManager::new(cfg.install_dir.clone());
             package_manager.uninstall_package(&package, None).await?;
@@ -61,10 +70,15 @@ async fn match_commands(args: Cli) -> anyhow::Result<()> {
             let provider_manager = ProviderManager::new_from_config(&cfg);
             
             if let Some(pkg_name) = package {
-                println!("Updating package: {}", pkg_name);
+                println!("{}", ui::title(&format!("Updating: {}", pkg_name)));
+                
+                let pb = ui::spinner();
+                pb.set_message(format!("Finding app: {}", pkg_name.cyan()));
                 
                 // Find the app and update it
                 let (app, provider) = provider_manager.find_app(&pkg_name, &cfg).await?;
+                pb.finish_with_message(ui::success(&format!("Found app: {} in {}", 
+                    app.name.green(), provider.name.blue())));
                 
                 let package_manager = PackageManager::new(cfg.install_dir.clone());
                 let app_manager = AppManager::new(package_manager);
@@ -73,9 +87,9 @@ async fn match_commands(args: Cli) -> anyhow::Result<()> {
                     app_manager.package_manager.update_package(pkg, &provider).await?;
                 }
                 
-                println!("Updated app: {}", app.name);
+                println!("{}", ui::success(&format!("Updated app: {}", app.name)));
             } else {
-                println!("Updating all packages");
+                println!("{}", ui::title("Updating all packages"));
                 
                 // Get all apps from providers and update them
                 let installed_packages = &cfg.packages;
@@ -83,16 +97,24 @@ async fn match_commands(args: Cli) -> anyhow::Result<()> {
                 let package_manager = PackageManager::new(cfg.install_dir.clone());
                 let app_manager = AppManager::new(package_manager);
                 
+                if installed_packages.is_empty() {
+                    println!("{}", ui::warning("No packages installed"));
+                    return Ok(());
+                }
+                
+                println!("{}", ui::info(&format!("Found {} installed packages", installed_packages.len())));
+                
                 for package in installed_packages {
                     // Find the provider that has this package
                     if let Ok((app, provider)) = provider_manager.find_app(&package.name, &cfg).await {
+                        println!("{}", ui::section(&format!("Updating: {}", app.name)));
                         for pkg in &app.packages {
                             app_manager.package_manager.update_package(pkg, &provider).await?;
                         }
                     }
                 }
                 
-                println!("All packages updated");
+                println!("{}", ui::success("All packages updated successfully"));
             }
         }
         Commands::Providers { command } => match_providers_commands(cfg, command).await?,
@@ -100,9 +122,14 @@ async fn match_commands(args: Cli) -> anyhow::Result<()> {
         Commands::Search { query } => search_apps(&cfg, &query).await?,
         Commands::List => list_available_apps(&cfg).await?,
         Commands::Sync => {
-            println!("Syncing packages from sgoinfre to goinfre...");
+            println!("{}", ui::title("Synchronizing packages"));
+            
+            let pb = ui::spinner();
+            pb.set_message("Syncing packages from sgoinfre to goinfre...");
+            
             cfg.sync_goinfre_from_sgoinfre()?;
-            println!("Sync complete");
+            
+            pb.finish_with_message(ui::success("Synchronization completed successfully"));
         },
         Commands::Config { command } => match_config_commands(&mut cfg, command).await?,
     }
@@ -115,22 +142,31 @@ async fn match_providers_commands(mut cfg: Config, command: ProvidersCommands) -
         ProvidersCommands::Add {
             provider: provider_name,
         } => {
+            println!("{}", ui::title(&format!("Adding provider: {}", provider_name)));
+            
+            let pb = ui::spinner();
+            pb.set_message("Validating provider format...");
+            
             // Parse provider string (format: "github:owner/repo@ref:path")
             let parts: Vec<&str> = provider_name.split(':').collect();
             if parts.len() != 3 || parts[0] != "github" {
+                pb.finish_with_message(ui::error("Invalid provider format"));
                 anyhow::bail!("Invalid provider format. Expected: github:owner/repo@ref:path");
             }
 
             let repo_parts: Vec<&str> = parts[1].split('@').collect();
             if repo_parts.len() != 2 {
+                pb.finish_with_message(ui::error("Invalid repository format"));
                 anyhow::bail!("Invalid repository format. Expected: owner/repo@ref");
             }
 
             let owner_repo: Vec<&str> = repo_parts[0].split('/').collect();
             if owner_repo.len() != 2 {
+                pb.finish_with_message(ui::error("Invalid owner/repo format"));
                 anyhow::bail!("Invalid owner/repo format. Expected: owner/repo");
             }
 
+            pb.set_message("Creating provider...");
             let provider = Provider {
                 name: provider_name.clone(),
                 source: ProviderSource::Github(GithubProvider {
@@ -142,21 +178,48 @@ async fn match_providers_commands(mut cfg: Config, command: ProvidersCommands) -
                 provider_handler_version: 1,
             };
 
+            pb.set_message("Adding provider to configuration...");
             provider_manager.add_provider(provider)?;
             provider_manager.save_to_config(&mut cfg);
             confy::store("diem", "config", &cfg)?;
-            println!("Added provider: {}", provider_name);
+            
+            pb.finish_with_message(ui::success(&format!("Added provider: {}", provider_name)));
         }
         ProvidersCommands::Remove { provider } => {
+            println!("{}", ui::title(&format!("Removing provider: {}", provider)));
+            
+            let pb = ui::spinner();
+            pb.set_message(format!("Removing provider: {}", provider.cyan()));
+            
             provider_manager.remove_provider(&provider)?;
             provider_manager.save_to_config(&mut cfg);
             confy::store("diem", "config", &cfg)?;
-            println!("Removed provider: {}", provider);
+            
+            pb.finish_with_message(ui::success(&format!("Removed provider: {}", provider)));
         }
         ProvidersCommands::List => {
-            println!("Installed providers:");
-            for provider in provider_manager.list_providers() {
-                println!("  - {}", provider.name);
+            println!("{}", ui::title("Installed Providers"));
+            
+            let providers = provider_manager.list_providers();
+            if providers.is_empty() {
+                println!("{}", ui::warning("No providers installed"));
+                return Ok(());
+            }
+            
+            // Use providers directly without unused data variable
+            for (i, provider) in providers.iter().enumerate() {
+                let provider_source = match &provider.source {
+                    ProviderSource::Github(github) => {
+                        format!("GitHub: {}/{} ({})", github.owner.cyan(), github.repo.green(), github.ref_.yellow())
+                    },
+                    ProviderSource::Artifactory(artifactory) => {
+                        format!("Artifactory: {}", artifactory.path.display().to_string().blue())
+                    }
+                };
+                
+                let number = format!("{}.", i + 1).cyan();
+                let name = provider.name.green().bold();
+                println!("  {} {} - {}", number, name, provider_source);
             }
         }
     }
@@ -279,19 +342,27 @@ async fn match_artifactory_commands(cfg: &mut Config, command: ArtifactoryComman
 }
 
 async fn search_apps(cfg: &Config, query: &str) -> Result<()> {
+    println!("{}", ui::title(&format!("Search Results for: {}", query.cyan())));
+    
+    let pb = ui::spinner();
+    pb.set_message(format!("Searching for apps matching: {}", query.cyan()));
+    
     let manager = ArtifactoryManager::new(cfg.clone());
     let results = manager.search_apps(query)?;
     
     if results.is_empty() {
-        println!("No apps found matching: {}", query);
+        pb.finish_with_message(ui::warning(&format!("No apps found matching: {}", query)));
         return Ok(());
     }
     
-    println!("Apps found for query '{}': ", query);
+    pb.finish_with_message(ui::success(&format!("Found {} artifactories with matching apps", results.len())));
+    
     for (artifactory, apps) in results {
-        println!("  From artifactory '{}': ", artifactory);
-        for app in apps {
-            println!("    - {}", app);
+        println!("{}", ui::section(&format!("From artifactory: {}", artifactory.green())));
+        
+        for (i, app) in apps.iter().enumerate() {
+            let number = format!("{}.", i + 1).cyan();
+            println!("  {} {}", number, app.green());
         }
     }
     
@@ -299,28 +370,59 @@ async fn search_apps(cfg: &Config, query: &str) -> Result<()> {
 }
 
 async fn list_available_apps(cfg: &Config) -> Result<()> {
+    println!("{}", ui::title("Available Applications"));
+    
+    let pb = ui::spinner();
+    pb.set_message("Loading subscribed artifactories...");
+    
     let manager = ArtifactoryManager::new(cfg.clone());
     let artifactories = manager.load_all_subscribed();
     
     if artifactories.is_empty() {
-        println!("No artifactories found. Subscribe to an artifactory first.");
+        pb.finish_with_message(ui::warning("No artifactories found. Subscribe to an artifactory first."));
         return Ok(());
     }
     
-    println!("Available apps:");
+    pb.finish_with_message(ui::success(&format!("Found {} artifactories", artifactories.len())));
+    
+    let mut app_count = 0;
     for result in artifactories {
         match result {
             Ok(artifactory) => {
-                println!("  From '{}': ", artifactory.name);
-                for app in artifactory.apps {
-                    println!("    - {} (v{})", app.name, app.version);
+                println!("{}", ui::section(&format!("From: {}", artifactory.name.green())));
+                
+                if artifactory.apps.is_empty() {
+                    println!("  {}", ui::info("No apps available in this artifactory"));
+                    continue;
+                }
+                
+                for (i, app) in artifactory.apps.iter().enumerate() {
+                    let number = format!("{}.", i + 1).cyan();
+                    let name = app.name.green().bold();
+                    let version = format!("v{}", app.version).yellow();
+                    
+                    let description = if let Some(desc) = &app.description {
+                        format!(" - {}", desc.blue())
+                    } else {
+                        "".to_string()
+                    };
+                    
+                    println!("  {} {} ({}){}",
+                        number,
+                        name,
+                        version,
+                        description
+                    );
+                    app_count += 1;
                 }
             },
             Err(e) => {
-                println!("  Error loading artifactory: {}", e);
+                println!("  {}", ui::error(&format!("Error loading artifactory: {}", e)));
             }
         }
     }
+    
+    println!("\n{}", ui::success(&format!("Total apps available: {}", app_count)));
     
     Ok(())
 }
@@ -328,43 +430,95 @@ async fn list_available_apps(cfg: &Config) -> Result<()> {
 async fn match_config_commands(cfg: &mut Config, command: ConfigCommands) -> Result<()> {
     match command {
         ConfigCommands::SetSgoinfre { path } => {
+            println!("{}", ui::title("Configuration Update"));
+            
+            let pb = ui::spinner();
+            pb.set_message(format!("Setting sgoinfre directory to: {}", path.display().to_string().cyan()));
+            
             cfg.sgoinfre_dir = Some(path.clone());
             confy::store("diem", "config", &cfg)?;
-            println!("Set sgoinfre directory to: {}", path.display());
+            
+            pb.finish_with_message(ui::success(&format!("Set sgoinfre directory to: {}", path.display())));
         },
         ConfigCommands::SetGoinfre { path } => {
+            println!("{}", ui::title("Configuration Update"));
+            
+            let pb = ui::spinner();
+            pb.set_message(format!("Setting goinfre directory to: {}", path.display().to_string().cyan()));
+            
             cfg.goinfre_dir = Some(path.clone());
             confy::store("diem", "config", &cfg)?;
-            println!("Set goinfre directory to: {}", path.display());
+            
+            pb.finish_with_message(ui::success(&format!("Set goinfre directory to: {}", path.display())));
         },
         ConfigCommands::SetSharedArtifactory { path } => {
+            println!("{}", ui::title("Configuration Update"));
+            
+            let pb = ui::spinner();
+            pb.set_message(format!("Setting shared artifactory directory to: {}", path.display().to_string().cyan()));
+            
             cfg.shared_artifactory_dir = Some(path.clone());
             confy::store("diem", "config", &cfg)?;
-            println!("Set shared artifactory directory to: {}", path.display());
+            
+            pb.finish_with_message(ui::success(&format!("Set shared artifactory directory to: {}", path.display())));
         },
         ConfigCommands::Show => {
-            println!("Current configuration:");
-            println!("  Install directory: {}", cfg.install_dir.display());
+            println!("{}", ui::title("Current Configuration"));
+            
+            let mut config_items = Vec::new();
+            
+            let install_dir = cfg.install_dir.display().to_string();
+            config_items.push(("Install directory", install_dir));
             
             if let Some(sgoinfre) = &cfg.sgoinfre_dir {
-                println!("  Sgoinfre directory: {}", sgoinfre.display());
+                let sgoinfre_dir = sgoinfre.display().to_string();
+                config_items.push(("Sgoinfre directory", sgoinfre_dir));
             } else {
-                println!("  Sgoinfre directory: Not set");
+                let not_set = "Not set".red().to_string();
+                config_items.push(("Sgoinfre directory", not_set));
             }
             
             if let Some(goinfre) = &cfg.goinfre_dir {
-                println!("  Goinfre directory: {}", goinfre.display());
+                let goinfre_dir = goinfre.display().to_string();
+                config_items.push(("Goinfre directory", goinfre_dir));
             } else {
-                println!("  Goinfre directory: Not set");
+                let not_set = "Not set".red().to_string();
+                config_items.push(("Goinfre directory", not_set));
             }
             
             if let Some(shared) = &cfg.shared_artifactory_dir {
-                println!("  Shared artifactory directory: {}", shared.display());
+                let shared_dir = shared.display().to_string();
+                config_items.push(("Shared artifactory", shared_dir));
             } else {
-                println!("  Shared artifactory directory: Not set");
+                let not_set = "Not set".red().to_string();
+                config_items.push(("Shared artifactory", not_set));
             }
             
-            println!("  Subscribed artifactories: {}", cfg.subscribed_artifactories.len());
+            let subscribed_count = cfg.subscribed_artifactories.len().to_string();
+            config_items.push(("Subscribed artifactories", subscribed_count));
+            
+            // Create a key-value table
+            ui::key_value_table("Settings", &config_items);
+            
+            // If there are providers, list them
+            if !cfg.providers.is_empty() {
+                println!("{}", ui::section("Providers"));
+                for (i, provider) in cfg.providers.iter().enumerate() {
+                    println!("  {}. {}", (i+1).to_string().cyan(), provider.name.green());
+                }
+            }
+            
+            // If there are artifactories, list them
+            if !cfg.subscribed_artifactories.is_empty() {
+                println!("{}", ui::section("Subscribed Artifactories"));
+                for (i, sub) in cfg.subscribed_artifactories.iter().enumerate() {
+                    let source_type = match &sub.source {
+                        ArtifactorySource::Local(_) => "Local".blue(),
+                        ArtifactorySource::Remote(_) => "Remote".magenta(),
+                    };
+                    println!("  {}. {} ({})", (i+1).to_string().cyan(), sub.name.green(), source_type);
+                }
+            }
         },
     }
     

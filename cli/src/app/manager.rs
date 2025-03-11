@@ -1,6 +1,6 @@
-use crate::{App, PackageManager, Provider};
+use crate::{App, PackageManager, Provider, utils::ui};
 use anyhow::Result;
-use indicatif::{ProgressBar, ProgressStyle};
+use colored::*;
 use semver::Version;
 
 // Helper function to recursively search for a binary in a directory
@@ -44,14 +44,9 @@ impl AppManager {
     }
 
     pub async fn install_app(&self, app: &App, provider: &Provider) -> Result<()> {
-        let pb = ProgressBar::new_spinner();
-        pb.set_style(
-            ProgressStyle::default_spinner()
-                .template("{spinner:.green} [{elapsed_precise}] {msg}")
-                .unwrap(),
-        );
+        let pb = ui::spinner();
 
-        pb.set_message(format!("Installing app: {} {}", app.name, app.version));
+        pb.set_message(format!("Installing app: {} {}", app.name.cyan(), app.version.to_string().yellow()));
 
         // Install each package required by the app
         for package in &app.packages {
@@ -61,23 +56,30 @@ impl AppManager {
         }
 
         // Create symlinks for each command
-        for cmd in &app.commands {
+        println!("{}", ui::section("Setting up commands"));
+        
+        for (i, cmd) in app.commands.iter().enumerate() {
             let package = &app.packages[0]; // Usually commands come from the main package
             let package_dir = self
                 .package_manager
                 .get_package_dir(&package.name, &package.version);
             
+            pb.set_message(format!("Setting up command [{}/{}]: {}", 
+                (i+1).to_string().yellow(), 
+                app.commands.len().to_string().yellow(), 
+                cmd.command.cyan()));
+            
             // Check if the binary exists - we need to be flexible with paths
             let target_path = package_dir.join(&cmd.path);
-            println!("Checking if target exists: {}", target_path.display());
+            println!("{}", ui::info(&format!("Checking path: {}", target_path.display())));
             
             if !target_path.exists() {
                 // First attempt: Look for the file directly without any prefix
                 let alternate_path = package_dir.join(cmd.path.file_name().unwrap_or_default());
-                println!("Trying alternate path: {}", alternate_path.display());
+                println!("{}", ui::info(&format!("Trying alternate path: {}", alternate_path.display())));
                 
                 if alternate_path.exists() {
-                    println!("Found binary at alternate path: {}", alternate_path.display());
+                    println!("{}", ui::success(&format!("Found binary at: {}", alternate_path.display())));
                     // Create a temporary symlink to make the expected structure
                     let parent = target_path.parent().unwrap_or(&package_dir);
                     std::fs::create_dir_all(parent)?;
@@ -89,10 +91,11 @@ impl AppManager {
                     std::os::windows::fs::symlink_file(&alternate_path, &target_path)?;
                 } else {
                     // Do a global search in the package directory
+                    println!("{}", ui::info("Searching for binary in package directory..."));
                     let found = find_binary_in_dir(&package_dir, cmd.path.file_name().unwrap_or_default().to_string_lossy().to_string());
                     
                     if let Some(found_path) = found {
-                        println!("Found binary through search: {}", found_path.display());
+                        println!("{}", ui::success(&format!("Found binary at: {}", found_path.display())));
                         // Create a temporary symlink to make the expected structure
                         let parent = target_path.parent().unwrap_or(&package_dir);
                         std::fs::create_dir_all(parent)?;
@@ -103,7 +106,8 @@ impl AppManager {
                         #[cfg(windows)]
                         std::os::windows::fs::symlink_file(&found_path, &target_path)?;
                     } else {
-                        return Err(anyhow::anyhow!("Command binary not found at expected path: {}", target_path.display()));
+                        return Err(anyhow::anyhow!("{}", 
+                            ui::error(&format!("Command binary not found at expected path: {}", target_path.display()))));
                     }
                 }
             }
@@ -111,16 +115,34 @@ impl AppManager {
             self.package_manager
                 .create_command_symlink(cmd, &package_dir)
                 .await?;
+                
+            println!("{}", ui::success(&format!("Command '{}' is now available", cmd.command)));
         }
 
-        pb.finish_with_message(format!(
+        pb.finish_with_message(ui::success(&format!(
             "Successfully installed {} {}",
             app.name, app.version
-        ));
+        )));
+        
+        // Display a summary of what was installed
+        println!("\n{}", ui::title(&format!("App: {} {}", app.name, app.version)));
+        if let Some(description) = &app.description {
+            println!("{}", description);
+        }
+        println!("\n{} {}", "Packages:".cyan().bold(), app.packages.len().to_string().yellow());
+        for package in &app.packages {
+            println!("  • {} {}", package.name.green(), package.version.to_string().yellow());
+        }
+        
+        println!("\n{} {}", "Commands:".cyan().bold(), app.commands.len().to_string().yellow());
+        for cmd in &app.commands {
+            println!("  • {} → {}", cmd.command.green(), cmd.path.display().to_string().blue());
+        }
+        
         Ok(())
     }
 
-    pub async fn uninstall_app(&self, app_name: &str, version: Option<Version>) -> Result<()> {
+    pub async fn uninstall_app(&self, _app_name: &str, _version: Option<Version>) -> Result<()> {
         // TODO: Implement app uninstallation
         // This should:
         // 1. Remove all app packages

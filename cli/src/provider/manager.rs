@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::io;
 
 use anyhow::Result;
 use semver::Version;
@@ -224,7 +223,7 @@ impl ProviderManager {
                 toml::from_str(&content)
                     .map_err(|e| anyhow::anyhow!("Failed to parse artifactory: {}", e))
             },
-            crate::config::ArtifactorySource::Remote(url) => {
+            crate::config::ArtifactorySource::Remote(_url) => {
                 // This would normally make a network request to fetch the remote artifactory
                 // For now, we'll return an error
                 Err(anyhow::anyhow!("Remote artifactories not yet implemented"))

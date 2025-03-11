@@ -15,4 +15,5 @@ pub struct App {
     pub commands: Vec<AppCommand>,
     pub license: String,
     pub app_handler_version: u8,
+    pub description: Option<String>,
 }
