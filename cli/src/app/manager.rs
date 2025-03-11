@@ -142,7 +142,7 @@ impl AppManager {
         Ok(())
     }
 
-    pub async fn uninstall_app(&self, app_name: &str, version: Option<Version>) -> Result<()> {
+    pub async fn uninstall_app(&self, _app_name: &str, _version: Option<Version>) -> Result<()> {
         // TODO: Implement app uninstallation
         // This should:
         // 1. Remove all app packages

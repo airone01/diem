@@ -1,6 +1,5 @@
 use colored::*;
 use indicatif::{ProgressBar, ProgressStyle};
-use cli_table::{format::Justify, Cell, CellStruct, Style, Table, TableStruct};
 use std::time::Duration;
 
 // Define color constants
@@ -77,17 +76,11 @@ pub fn command(text: &str) -> String {
     format!("> {}", text.magenta())
 }
 
-// Table helpers
-pub fn create_table(headers: Vec<&str>) -> TableStruct {
-    let header_cells: Vec<CellStruct> = headers
-        .into_iter()
-        .map(|h| h.cell().bold(true).justify(Justify::Center))
-        .collect();
-
-    Table::new()
-        .header(header_cells)
-        .border(Style::modern())
-        .separator(cli_table::format::Separator::Row)
+// Simple table formatting
+pub fn create_table_header(headers: Vec<&str>) -> String {
+    let header = headers.join(" | ");
+    let separator = "-".repeat(header.len());
+    format!("{}\n{}", header.bold(), separator)
 }
 
 // Function to list items in a table format
@@ -105,16 +98,13 @@ pub fn display_list<T: AsRef<str>>(title: &str, items: &[T]) {
 }
 
 // Function to create a table for key-value pairs
-pub fn key_value_table(title: &str, data: Vec<(&str, &str)>) -> String {
+pub fn key_value_table(title: &str, data: &[(&str, String)]) {
     println!("{}", section(title));
-    let mut result = String::new();
     
     let max_key_len = data.iter().map(|(k, _)| k.len()).max().unwrap_or(0);
     
     for (key, value) in data {
         let formatted_key = format!("{:width$}", key, width = max_key_len).cyan();
-        result.push_str(&format!("  {}: {}\n", formatted_key, value));
+        println!("  {}: {}", formatted_key, value);
     }
-    
-    result
 }

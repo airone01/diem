@@ -206,11 +206,14 @@ async fn match_providers_commands(mut cfg: Config, command: ProvidersCommands) -
                 return Ok(());
             }
             
-            let mut data = Vec::new();
+            // Use providers directly without unused data variable
             for (i, provider) in providers.iter().enumerate() {
                 let provider_source = match &provider.source {
                     ProviderSource::Github(github) => {
                         format!("GitHub: {}/{} ({})", github.owner.cyan(), github.repo.green(), github.ref_.yellow())
+                    },
+                    ProviderSource::Artifactory(artifactory) => {
+                        format!("Artifactory: {}", artifactory.path.display().to_string().blue())
                     }
                 };
                 
@@ -464,30 +467,38 @@ async fn match_config_commands(cfg: &mut Config, command: ConfigCommands) -> Res
             
             let mut config_items = Vec::new();
             
-            config_items.push(("Install directory", cfg.install_dir.display().to_string().as_str()));
+            let install_dir = cfg.install_dir.display().to_string();
+            config_items.push(("Install directory", install_dir));
             
             if let Some(sgoinfre) = &cfg.sgoinfre_dir {
-                config_items.push(("Sgoinfre directory", sgoinfre.display().to_string().as_str()));
+                let sgoinfre_dir = sgoinfre.display().to_string();
+                config_items.push(("Sgoinfre directory", sgoinfre_dir));
             } else {
-                config_items.push(("Sgoinfre directory", "Not set".red().to_string().as_str()));
+                let not_set = "Not set".red().to_string();
+                config_items.push(("Sgoinfre directory", not_set));
             }
             
             if let Some(goinfre) = &cfg.goinfre_dir {
-                config_items.push(("Goinfre directory", goinfre.display().to_string().as_str()));
+                let goinfre_dir = goinfre.display().to_string();
+                config_items.push(("Goinfre directory", goinfre_dir));
             } else {
-                config_items.push(("Goinfre directory", "Not set".red().to_string().as_str()));
+                let not_set = "Not set".red().to_string();
+                config_items.push(("Goinfre directory", not_set));
             }
             
             if let Some(shared) = &cfg.shared_artifactory_dir {
-                config_items.push(("Shared artifactory", shared.display().to_string().as_str()));
+                let shared_dir = shared.display().to_string();
+                config_items.push(("Shared artifactory", shared_dir));
             } else {
-                config_items.push(("Shared artifactory", "Not set".red().to_string().as_str()));
+                let not_set = "Not set".red().to_string();
+                config_items.push(("Shared artifactory", not_set));
             }
             
-            config_items.push(("Subscribed artifactories", cfg.subscribed_artifactories.len().to_string().as_str()));
+            let subscribed_count = cfg.subscribed_artifactories.len().to_string();
+            config_items.push(("Subscribed artifactories", subscribed_count));
             
             // Create a key-value table
-            println!("{}", ui::key_value_table("Settings", config_items));
+            ui::key_value_table("Settings", &config_items);
             
             // If there are providers, list them
             if !cfg.providers.is_empty() {
