@@ -188,21 +188,41 @@ impl ProviderManager {
         let mut found_apps = Vec::new();
         let mut artifactories_used = Vec::new();
         
+        println!("Debug: Searching for app '{}' in {} subscribed artifactories", 
+                app_name, config.subscribed_artifactories.len());
+        
         for subscription in &config.subscribed_artifactories {
+            println!("Debug: Checking artifactory subscription: {}", subscription.name);
+            
             let artifactory = match self.load_artifactory_from_subscription(subscription) {
-                Ok(art) => art,
-                Err(_) => continue, // Skip artifactories that fail to load
+                Ok(art) => {
+                    println!("Debug: Successfully loaded artifactory: {} with {} apps", 
+                           art.name, art.apps.len());
+                    art
+                },
+                Err(e) => {
+                    println!("Debug: Failed to load artifactory: {}", e);
+                    continue; // Skip artifactories that fail to load
+                },
             };
             
             // Look for the app in the artifactory
             for app in artifactory.apps {
+                println!("Debug: Checking app: {} v{}", app.name, app.version);
+                
                 if app.name == app_name {
+                    println!("Debug: Found matching app name: {}", app_name);
+                    
                     if let Some(req_version) = version {
                         if app.version == *req_version {
+                            println!("Debug: Found exact version match: {}", req_version);
                             found_apps.push(app);
                             artifactories_used.push(subscription.name.clone());
+                        } else {
+                            println!("Debug: Version mismatch - requested: {}, found: {}", req_version, app.version);
                         }
                     } else {
+                        println!("Debug: No specific version requested, using found version: {}", app.version);
                         found_apps.push(app);
                         artifactories_used.push(subscription.name.clone());
                     }
@@ -210,6 +230,7 @@ impl ProviderManager {
             }
         }
         
+        println!("Debug: Found {} matching apps in artifactories", found_apps.len());
         Ok((found_apps, artifactories_used))
     }
     

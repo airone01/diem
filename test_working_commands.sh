@@ -59,8 +59,9 @@ echo -e "\n${YELLOW}2. Listing providers...${NC}"
 $DIEM_CMD providers list
 
 # Subscribe to the artifactory (fixed command)
-echo -e "\n${YELLOW}3. Subscribing to an artifactory...${NC}"
-$DIEM_CMD artifactory subscribe "Test" "$ARTIFACTORY_DIR/test_art.toml"
+echo -e "\n${YELLOW}3. Subscribing to an artifactory (may show 'already subscribed')...${NC}"
+$DIEM_CMD artifactory unsubscribe "Test" || echo "No previous subscription to remove"
+$DIEM_CMD artifactory subscribe "Test" "$ARTIFACTORY_DIR/test_art.toml" || echo "Could not subscribe to artifactory"
 
 # List subscribed artifactories
 echo -e "\n${YELLOW}4. Listing artifactories...${NC}"

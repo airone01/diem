@@ -54,11 +54,38 @@ async fn match_commands(args: Cli) -> anyhow::Result<()> {
             let provider_manager = ProviderManager::new_from_config(&cfg);
 
             pb.set_message(format!("Finding app: {}", app.cyan()));
-            let (app, provider) = provider_manager.find_app(&app, &cfg).await?;
-            pb.finish_with_message(ui::success(&format!("Found app: {} in {}", 
-                app.name.green(), provider.name.blue())));
-                
-            app_manager.install_app(&app, &provider).await?;
+            println!("Debug: Searching for app '{}' in providers", app);
+            
+            match provider_manager.find_app(&app, &cfg).await {
+                Ok((app, provider)) => {
+                    pb.finish_with_message(ui::success(&format!("Found app: {} in {}", 
+                        app.name.green(), provider.name.blue())));
+                    
+                    println!("Debug: Install directory is {}", cfg.install_dir.display());
+                    println!("Debug: App has {} packages", app.packages.len());
+                    for (i, pkg) in app.packages.iter().enumerate() {
+                        println!("Debug: Package #{}: {} {}", i+1, pkg.name, pkg.version);
+                        if let Some(src) = &pkg.source {
+                            println!("Debug: Package source: {}", src);
+                        }
+                    }
+                    
+                    match app_manager.install_app(&app, &provider).await {
+                        Ok(_) => {
+                            println!("Debug: App installation succeeded");
+                        },
+                        Err(e) => {
+                            println!("Debug: App installation failed: {}", e);
+                            return Err(e);
+                        }
+                    }
+                },
+                Err(e) => {
+                    pb.finish_with_message(ui::error(&format!("Failed to find app: {}", app)));
+                    println!("Debug: Failed to find app: {}", e);
+                    return Err(e);
+                }
+            }
         }
         Commands::Remove { package } => {
             println!("{}", ui::title(&format!("Removing: {}", package)));
