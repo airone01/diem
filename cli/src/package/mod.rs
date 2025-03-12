@@ -1,5 +1,8 @@
 pub(crate) mod manager;
 
+#[cfg(test)]
+mod tests;
+
 use semver::Version;
 use serde::{Deserialize, Serialize};
 

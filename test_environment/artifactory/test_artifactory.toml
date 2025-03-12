@@ -1,0 +1,25 @@
+name = "Test Artifactory"
+description = "Artifactory for testing diem"
+public = true
+maintainer = "Test User"
+artifactory_handler_version = 1
+
+[[apps]]
+name = "hello"
+version = "1.0.0"
+license = "MIT"
+description = "A simple hello world app"
+app_handler_version = 0
+
+[[apps.commands]]
+command = "hello"
+path = "bin/hello"
+
+[[apps.packages]]
+name = "hello"
+version = "1.0.0"
+sha256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+license = "MIT"
+source = "hello_1.0.0.tar.gz"
+dependencies = []
+package_handler_version = 0

@@ -7,6 +7,9 @@ use std::io;
 
 use crate::{Package, Provider};
 
+#[cfg(test)]
+mod tests;
+
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Config {
     pub packages: Vec<Package>,

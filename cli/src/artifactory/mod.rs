@@ -1,5 +1,8 @@
 pub mod manager;
 
+#[cfg(test)]
+mod tests;
+
 use serde::{Deserialize, Serialize};
 
 use crate::App;
