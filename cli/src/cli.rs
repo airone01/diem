@@ -197,6 +197,13 @@ pub enum ConfigCommands {
         path: PathBuf,
     },
     
+    /// Set the installation directory
+    #[command(name = "set-install-dir")]
+    SetInstallDir {
+        /// Path to the installation directory
+        path: PathBuf,
+    },
+    
     /// Show the current configuration
     Show,
 }

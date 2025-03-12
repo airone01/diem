@@ -257,7 +257,7 @@ impl PackageManager {
                     
                     // Special handling for packages with a single top-level directory
                     // If there's only one directory in package_dir and it's not bin/, move its contents up
-                    let entries = std::fs::read_dir(&package_dir)?;
+                    let _entries = std::fs::read_dir(&package_dir)?;
                     let mut dirs = Vec::new();
                     
                     println!("{}", ui::info(&format!("Analyzing package structure in: {}", package_dir.display())));

@@ -489,6 +489,20 @@ async fn match_config_commands(cfg: &mut Config, command: ConfigCommands) -> Res
             
             pb.finish_with_message(ui::success(&format!("Set shared artifactory directory to: {}", path.display())));
         },
+        ConfigCommands::SetInstallDir { path } => {
+            println!("{}", ui::title("Configuration Update"));
+            
+            let pb = ui::spinner();
+            pb.set_message(format!("Setting installation directory to: {}", path.display().to_string().cyan()));
+            
+            // First ensure the directory exists or can be created
+            std::fs::create_dir_all(&path)?;
+            
+            cfg.install_dir = path.clone();
+            confy::store("diem", "config", &cfg)?;
+            
+            pb.finish_with_message(ui::success(&format!("Set installation directory to: {}", path.display())));
+        },
         ConfigCommands::Show => {
             println!("{}", ui::title("Current Configuration"));
             
